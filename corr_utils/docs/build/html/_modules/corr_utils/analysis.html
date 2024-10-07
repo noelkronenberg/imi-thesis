@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>corr_utils.analysis &mdash; corr_utils 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js?v=e031e9a9"></script>
+        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            corr_utils
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../corr_utils.html">corr_utils package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">corr_utils</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../corr_utils.html">corr_utils</a></li>
+      <li class="breadcrumb-item active">corr_utils.analysis</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for corr_utils.analysis</h1><div class="highlight"><pre>
+<span></span><span class="c1"># author: Noel Kronenberg</span>
+
+<span class="kn">import</span> <span class="nn">corr_utils</span>
+<span class="kn">import</span> <span class="nn">corr_utils.covariate</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">norm</span>
+
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+
+<span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">train_test_split</span><span class="p">,</span> <span class="n">cross_val_score</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">roc_auc_score</span><span class="p">,</span> <span class="n">roc_curve</span><span class="p">,</span> <span class="n">brier_score_loss</span><span class="p">,</span> <span class="n">precision_recall_curve</span><span class="p">,</span> <span class="n">average_precision_score</span>
+<span class="kn">from</span> <span class="nn">sklearn.calibration</span> <span class="kn">import</span> <span class="n">calibration_curve</span>
+<span class="kn">from</span> <span class="nn">dcurves</span> <span class="kn">import</span> <span class="n">dca</span><span class="p">,</span> <span class="n">plot_graphs</span>
+
+<span class="kn">import</span> <span class="nn">statsmodels.api</span> <span class="k">as</span> <span class="nn">sm</span>
+<span class="kn">from</span> <span class="nn">sklearn.linear_model</span> <span class="kn">import</span> <span class="n">LogisticRegression</span><span class="p">,</span> <span class="n">LinearRegression</span>
+<span class="kn">from</span> <span class="nn">sklearn.feature_selection</span> <span class="kn">import</span> <span class="n">RFE</span>
+
+<span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">StandardScaler</span><span class="p">,</span> <span class="n">MinMaxScaler</span>
+<span class="kn">from</span> <span class="nn">sklearn.pipeline</span> <span class="kn">import</span> <span class="n">make_pipeline</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s1">&#39;font.family&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;DejaVu Sans&#39;</span>
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+
+<span class="k">global</span> <span class="n">default_key</span> 
+<span class="c1"># default_key:str = corr_utils.default_key</span>
+
+<div class="viewcode-block" id="evaluate_subgroups"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.evaluate_subgroups">[docs]</a><span class="k">def</span> <span class="nf">evaluate_subgroups</span><span class="p">(</span><span class="n">subgroups</span><span class="p">:</span><span class="nb">dict</span><span class="p">,</span> <span class="n">score_columns</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">dca_y_limits</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">],</span> <span class="n">dca_thresholds</span><span class="p">:</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.10</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">),</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validates a score on all important metrics.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        subgroups (dict): A dict of subgroup DataFrames (&#39;name&#39;: DataFrame). Works with create_subgroups().</span>
+<span class="sd">        score_columns (list): The column names containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        dca_y_limits (list, optional): Y-axis limits for the decision curve analysis (DCA) plot. Defaults to [-0.01, 0.02].</span>
+<span class="sd">        dca_thresholds (np.ndarray, optional): Array of thresholds for DCA. Defaults to np.arange(0, 0.10, 0.01).</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: Prints the results</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+     
+    <span class="k">for</span> <span class="n">subgroup</span> <span class="ow">in</span> <span class="n">subgroups</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;########################################&#39;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">subgroup</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">validate_score</span><span class="p">(</span><span class="n">subgroups</span><span class="p">[</span><span class="n">subgroup</span><span class="p">],</span> <span class="n">score_columns</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="p">,</span> <span class="n">dca_y_limits</span><span class="p">,</span> <span class="n">dca_thresholds</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="get_probabilities"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_probabilities">[docs]</a><span class="k">def</span> <span class="nf">get_probabilities</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">plot</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">show_regression</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the probabilities for an outcome given a score value.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        score_column (str): The column name containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        plot (bool): Plot the resulting probabilities. Defaults to False.</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        show_regression (bool, optional): Whether to show the regression results. Defaults to False.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: A DataFrame containing the probabilities.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_temp</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+      
+    <span class="n">X</span> <span class="o">=</span> <span class="n">prepare_regression_data</span><span class="p">(</span><span class="n">df_temp</span><span class="p">[[</span><span class="n">score_column</span><span class="p">]],</span> <span class="n">scale</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">intercept</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">df_temp</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">Logit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">show_regression</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+
+    <span class="n">unique_scores</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">df_temp</span><span class="p">[</span><span class="n">score_column</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">categorical_columns</span> <span class="o">!=</span> <span class="p">[]:</span>
+        <span class="n">unique_scores_encoded</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span><span class="n">unique_scores</span><span class="p">,</span> <span class="n">drop_first</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">X_new</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">add_constant</span><span class="p">(</span><span class="n">unique_scores_encoded</span><span class="p">)</span> 
+        <span class="n">predicted_proba</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_new</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">X_new</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">add_constant</span><span class="p">(</span><span class="n">unique_scores</span><span class="p">)</span> 
+        <span class="n">predicted_proba</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_new</span><span class="p">)</span>    
+    
+    <span class="n">df_probabilities</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="n">score_column</span><span class="p">:</span> <span class="n">unique_scores</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">:</span> <span class="n">predicted_proba</span><span class="p">})</span>
+
+    <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df_probabilities</span><span class="p">[</span><span class="n">score_column</span><span class="p">],</span> <span class="n">df_probabilities</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">outcome_column</span><span class="si">}</span><span class="s1">_probability vs. </span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="n">score_column</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">df_probabilities</span></div>
+
+<span class="kn">from</span> <span class="nn">sklearn.linear_model</span> <span class="kn">import</span> <span class="n">LogisticRegression</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+
+<div class="viewcode-block" id="get_test_data"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_test_data">[docs]</a><span class="k">def</span> <span class="nf">get_test_data</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">confounders</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">show_regression</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the probabilities for an outcome given a score value and return a test set that was excluded in that calculation. Allows for confounders to be included.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data. </span>
+<span class="sd">        score_column (str): The column name containing the scores. Defaults to &#39;&#39;.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators. Defaults to &#39;&#39;.</span>
+<span class="sd">        test_size (str, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        confounders (list, optional): A list of confounders to include. Defaults to [].</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        show_regression (bool, optional): Whether to show the regression results. Defaults to False.</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: A DataFrame containing a test set with the probabilities.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_temp</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">test_size</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">df_train</span><span class="p">,</span> <span class="n">df_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">df_temp</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">df_train</span> <span class="o">=</span> <span class="n">df_test</span> <span class="o">=</span> <span class="n">df_temp</span>
+
+    <span class="k">if</span> <span class="n">calculate_proba</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">confounders</span> <span class="o">==</span> <span class="p">[]:</span>
+            <span class="n">df_probabilities</span> <span class="o">=</span> <span class="n">get_probabilities</span><span class="p">(</span><span class="n">df_train</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">show_regression</span><span class="o">=</span><span class="n">show_regression</span><span class="p">)</span>
+            <span class="n">df_test</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">df_test</span><span class="p">[[</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">]],</span> <span class="n">df_probabilities</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s1">&#39;left&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">prepare_regression_data</span><span class="p">(</span><span class="n">df_train</span><span class="p">[[</span><span class="n">score_column</span><span class="p">]</span> <span class="o">+</span> <span class="n">confounders</span><span class="p">],</span> <span class="n">scale</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">intercept</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">)</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">df_train</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span>
+
+            <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">Logit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">show_regression</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+
+            <span class="n">X_test</span> <span class="o">=</span> <span class="n">prepare_regression_data</span><span class="p">(</span><span class="n">X_test</span><span class="p">[[</span><span class="n">score_column</span><span class="p">]</span> <span class="o">+</span> <span class="n">confounders</span><span class="p">],</span> <span class="n">scale</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">intercept</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">)</span>
+            <span class="n">df_test</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+            <span class="n">df_test</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[[</span><span class="n">score_column</span><span class="p">]</span> <span class="o">+</span> <span class="n">confounders</span> <span class="o">+</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">outcome_column</span><span class="p">]]</span>
+
+    <span class="k">return</span> <span class="n">df_test</span></div>
+
+<div class="viewcode-block" id="get_train_data"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_train_data">[docs]</a><span class="k">def</span> <span class="nf">get_train_data</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">confounders</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">show_regression</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the probabilities for an outcome given a score value and return a train set that was included in that calculation. Allows for confounders to be included.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data. </span>
+<span class="sd">        score_column (str): The column name containing the scores. Defaults to &#39;&#39;.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators. Defaults to &#39;&#39;.</span>
+<span class="sd">        test_size (str, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        confounders (list, optional): A list of confounders to include. Defaults to [].</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        show_regression (bool, optional): Whether to show the regression results. Defaults to False.</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: A DataFrame containing a train set with the probabilities.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_temp</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">test_size</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">df_train</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">df_temp</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">df_train</span> <span class="o">=</span> <span class="n">df_temp</span>
+
+    <span class="k">if</span> <span class="n">calculate_proba</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">confounders</span> <span class="o">==</span> <span class="p">[]:</span>
+            <span class="n">df_probabilities</span> <span class="o">=</span> <span class="n">get_probabilities</span><span class="p">(</span><span class="n">df_train</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">show_regression</span><span class="o">=</span><span class="n">show_regression</span><span class="p">)</span>
+            <span class="n">df_train</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">df_train</span><span class="p">,</span> <span class="n">df_probabilities</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s1">&#39;left&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">prepare_regression_data</span><span class="p">(</span><span class="n">df_train</span><span class="p">[[</span><span class="n">score_column</span><span class="p">]</span> <span class="o">+</span> <span class="n">confounders</span><span class="p">],</span> <span class="n">scale</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">intercept</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">)</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">df_train</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span>
+
+            <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">Logit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">show_regression</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+
+            <span class="n">df_train</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df_train</span></div>
+
+<div class="viewcode-block" id="get_confidence_intervals"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_confidence_intervals">[docs]</a><span class="k">def</span> <span class="nf">get_confidence_intervals</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">confounders</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">show_regression</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the probabilities confidence intervals (CI) around the probabilities for a score and outcome and modifies the DataFrame in place (!). Allows for confounders to be included.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data. </span>
+<span class="sd">        score_column (str): The column name containing the scores. </span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators. </span>
+<span class="sd">        test_size (str, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        confounders (list, optional): A list of confounders to include. Defaults to [].</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        show_regression (bool, optional): Whether to show the regression results. Defaults to False.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        None: The original DataFrame is modified in place (!).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">test_size</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">df_train</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">df_train</span> <span class="o">=</span> <span class="n">df</span>
+    
+    <span class="k">if</span> <span class="n">confounders</span> <span class="o">==</span> <span class="p">[]:</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">prepare_regression_data</span><span class="p">(</span><span class="n">df_train</span><span class="p">[[</span><span class="n">score_column</span><span class="p">]],</span> <span class="n">scale</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">intercept</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">prepare_regression_data</span><span class="p">(</span><span class="n">df_train</span><span class="p">[[</span><span class="n">score_column</span><span class="p">]</span> <span class="o">+</span> <span class="n">confounders</span><span class="p">],</span> <span class="n">scale</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">intercept</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">)</span>
+    
+    <span class="n">y</span> <span class="o">=</span> <span class="n">df_train</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">Logit</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">show_regression</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+
+    <span class="c1"># df_train_full = df_train.copy()</span>
+    <span class="c1"># df_train_full[f&#39;{score_column}_probability&#39;] = predicted_probs = model.predict(X)</span>
+
+    <span class="n">predicted_probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+    <span class="c1"># based on: https://stackoverflow.com/a/47419474; reference: https://en.wikipedia.org/wiki/Delta_method</span>
+    <span class="n">cov</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">cov_params</span><span class="p">()</span>
+    <span class="n">gradient</span> <span class="o">=</span> <span class="p">(</span><span class="n">predicted_probs</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">predicted_probs</span><span class="p">)</span> <span class="o">*</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">T</span> 
+    <span class="n">gradient</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">gradient</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">std_errors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">cov</span><span class="p">),</span> <span class="n">g</span><span class="p">))</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">gradient</span><span class="p">])</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">norm</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="mf">0.975</span><span class="p">)</span> <span class="c1"># z-score for 95% CI</span>
+    <span class="n">ci_upper</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">predicted_probs</span> <span class="o">+</span> <span class="n">std_errors</span> <span class="o">*</span> <span class="n">z</span><span class="p">))</span>
+    <span class="n">ci_lower</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">predicted_probs</span> <span class="o">-</span> <span class="n">std_errors</span> <span class="o">*</span> <span class="n">z</span><span class="p">))</span>
+
+    <span class="n">df_train</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability_CI_lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ci_lower</span>
+    <span class="n">df_train</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability_CI_upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ci_upper</span>
+
+    <span class="n">ci_map_lower</span> <span class="o">=</span> <span class="n">df_train</span><span class="p">[[</span><span class="n">score_column</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability_CI_lower&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">score_column</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability_CI_lower&#39;</span><span class="p">]</span>
+    <span class="n">ci_map_upper</span> <span class="o">=</span> <span class="n">df_train</span><span class="p">[[</span><span class="n">score_column</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability_CI_upper&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">score_column</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability_CI_upper&#39;</span><span class="p">]</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability_CI_lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">score_column</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">ci_map_lower</span><span class="p">)</span>
+    <span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability_CI_upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">score_column</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">ci_map_upper</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="get_probabilities_for_cohort"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_probabilities_for_cohort">[docs]</a><span class="k">def</span> <span class="nf">get_probabilities_for_cohort</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">confounders</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">show_regression</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the probabilities for an outcome given a score value and modify DataFrame in place (!). Allows for confounders to be included.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        score_column (str): The column name containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        test_size (str, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        confounders (list, optional): A list of confounders to include. Defaults to [].</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        show_regression (bool, optional): Whether to show the regression results. Defaults to False.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        None: The original DataFrame is modified in place (!).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_train</span> <span class="o">=</span> <span class="n">get_train_data</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">confounders</span><span class="o">=</span><span class="n">confounders</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">show_regression</span><span class="o">=</span><span class="n">show_regression</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># df_test = get_test_data(df_temp, test_siz=test_size)</span>
+
+    <span class="n">proba_map</span> <span class="o">=</span> <span class="n">df_train</span><span class="p">[[</span><span class="n">score_column</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">score_column</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">score_column</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">proba_map</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="get_auroc"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_auroc">[docs]</a><span class="k">def</span> <span class="nf">get_auroc</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_columns</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plots the ROC curve with AUC for a score and outcome.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        score_columns (list): The column names containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">score_column</span> <span class="ow">in</span> <span class="n">score_columns</span><span class="p">:</span>
+        <span class="n">df_test</span> <span class="o">=</span> <span class="n">get_test_data</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span> <span class="c1"># NOTE: test_size == 0 is handled in get_test_data</span>
+
+        <span class="n">y_true</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span>
+        <span class="n">y_score</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span>
+
+        <span class="n">fpr</span><span class="p">,</span> <span class="n">tpr</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">roc_curve</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_score</span><span class="p">)</span>
+        <span class="n">auc</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_score</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fpr</span><span class="p">,</span> <span class="n">tpr</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1"> (AUC = </span><span class="si">{</span><span class="n">auc</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">)</span> <span class="c1"># baseline</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;False Positive Rate&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;True Positive Rate&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;ROC Curve&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s1">&#39;lower right&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+<span class="c1"># reference: https://glassboxmedicine.com/2019/03/02/measuring-performance-auprc/</span>
+<div class="viewcode-block" id="get_auprc"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_auprc">[docs]</a><span class="k">def</span> <span class="nf">get_auprc</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_columns</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.2</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plots the Precision-Recall curve (PRC) with AUC for a score and outcome.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        score_columsn (list): The column names containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        label_name (str): Name of the model or label for legend.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">score_column</span> <span class="ow">in</span> <span class="n">score_columns</span><span class="p">:</span>
+        <span class="n">df_test</span> <span class="o">=</span> <span class="n">get_test_data</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span>  <span class="c1"># NOTE: test_size == 0 is handled in get_test_data</span>
+
+        <span class="n">y_true</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span>
+        <span class="n">y_score</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="n">score_column</span><span class="p">]</span>
+
+        <span class="n">precision</span><span class="p">,</span> <span class="n">recall</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">precision_recall_curve</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_score</span><span class="p">)</span>
+        <span class="n">auc_pr</span> <span class="o">=</span> <span class="n">average_precision_score</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_score</span><span class="p">)</span>
+
+        <span class="c1"># baseline (ratio of positive instances)</span>
+        <span class="n">baseline</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">y_true</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_true</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">recall</span><span class="p">,</span> <span class="n">precision</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1"> (AUPRC = </span><span class="si">{</span><span class="n">auc_pr</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>    
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">baseline</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Baseline = </span><span class="si">{</span><span class="n">baseline</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span> <span class="c1"># baseline</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Recall&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Precision&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Precision-Recall Curve&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper right&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="prepare_regression_data"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.prepare_regression_data">[docs]</a><span class="k">def</span> <span class="nf">prepare_regression_data</span><span class="p">(</span><span class="n">df_input_data</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">scale</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">intercept</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[])</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Prepares data for regression. Adds an intercept and optionally scales the data and also one-hot encodes categorical variables.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        df_input_data (pandas.DataFrame): DataFrame containing the data.</span>
+<span class="sd">        scale (bool, optional): If True, data will be scaled (range(0,1)). Defaults to True.</span>
+<span class="sd">        intercept (bool, optional): If True, an intercept will be added. Defaults to True.</span>
+<span class="sd">        categorical_columns (list, optional): Columns containing categorical data (will be one-hot encoded). Defaults to [].</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pandas.DataFrame: DataFrame with the prepared data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+      
+    <span class="c1"># one-hot encoding for categorical columns</span>
+    <span class="n">df_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span><span class="n">df_input_data</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span> <span class="n">columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">drop_first</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># scale data</span>
+    <span class="k">if</span> <span class="n">scale</span><span class="p">:</span>
+        <span class="n">scaler</span> <span class="o">=</span> <span class="n">MinMaxScaler</span><span class="p">(</span><span class="n">feature_range</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="n">ndarray_data</span> <span class="o">=</span> <span class="n">scaler</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">df_data</span><span class="p">)</span>
+        <span class="n">df_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">ndarray_data</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">df_data</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">df_data</span><span class="o">.</span><span class="n">index</span><span class="p">)</span> <span class="c1"># convert back to df</span>
+
+    <span class="c1"># add intercept</span>
+    <span class="k">if</span> <span class="n">intercept</span><span class="p">:</span>
+        <span class="n">df_data</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">add_constant</span><span class="p">(</span><span class="n">df_data</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df_data</span></div>
+
+<div class="viewcode-block" id="Model"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.Model">[docs]</a><span class="k">class</span> <span class="nc">Model</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enumeration for selecting different model packages (SKLEARN = sklearn for prediction tasks, STATS = statsmodels for a more statistical approach).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">SKLEARN</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">STATS</span> <span class="o">=</span> <span class="mi">2</span></div>
+
+<div class="viewcode-block" id="get_regression"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_regression">[docs]</a><span class="k">def</span> <span class="nf">get_regression</span><span class="p">(</span><span class="n">X</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">label_name</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="p">[],</span> <span class="n">use_lasso</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">intercept</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">scale_data</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">selected_model</span><span class="p">:</span><span class="n">Model</span><span class="o">=</span><span class="n">Model</span><span class="o">.</span><span class="n">STATS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Trains a logistic regression model on the given data. Plots the results.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        X (pandas.DataFrame): Features for training the model.</span>
+<span class="sd">        y (pandas.Series): Target variable.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        label_name (str, optional): Label for title and legend.</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        use_lasso (bool, optional): Regularize the regression with lasso. Defaults to False.</span>
+<span class="sd">        intercept (bool, optional): If True, an intercept will be added. Defaults to True.</span>
+<span class="sd">        scale_data (bool, optional): If True, data will be scaled (range(0,1)). Defaults to True.</span>
+<span class="sd">        selected_model (Model, optional): Selection of which regression model to use (Model.SKLEARN = sklearn for prediction tasks, Model.STATS = statsmodels for a more statistical approach). Defaults to STATS.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pandas.DataFrame: A DataFrames for the weights.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># data preparation</span>
+
+    <span class="n">X</span> <span class="o">=</span> <span class="n">prepare_regression_data</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale_data</span><span class="p">,</span> <span class="n">intercept</span><span class="o">=</span><span class="n">intercept</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">test_size</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span> <span class="c1"># NOTE: check sensibility</span>
+        <span class="n">X_train</span> <span class="o">=</span> <span class="n">X_test</span> <span class="o">=</span> <span class="n">X</span>
+        <span class="n">y_train</span> <span class="o">=</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">y</span>
+
+    <span class="c1"># training</span>
+
+    <span class="k">if</span> <span class="n">selected_model</span> <span class="o">==</span> <span class="n">Model</span><span class="o">.</span><span class="n">SKLEARN</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">use_lasso</span><span class="p">:</span>
+                <span class="n">model</span> <span class="o">=</span> <span class="n">LogisticRegression</span><span class="p">(</span><span class="n">penalty</span><span class="o">=</span><span class="s1">&#39;l1&#39;</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="s1">&#39;saga&#39;</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">max_iter</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">C</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">LogisticRegression</span><span class="p">(</span><span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+
+        <span class="n">pipe</span> <span class="o">=</span> <span class="n">make_pipeline</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="c1"># apply scaling on training data (reference: https://scikit-learn.org/stable/modules/preprocessing.html)</span>
+        <span class="n">pipe</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span> 
+        <span class="n">y_pred_proba</span> <span class="o">=</span> <span class="n">pipe</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="c1"># positive class probabilities</span>
+    
+    <span class="k">if</span> <span class="n">selected_model</span> <span class="o">==</span> <span class="n">Model</span><span class="o">.</span><span class="n">STATS</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">Logit</span><span class="p">(</span><span class="n">y_train</span><span class="p">,</span> <span class="n">X_train</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">use_lasso</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit_regularized</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s1">&#39;l1&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+        <span class="n">y_pred_proba</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+    <span class="c1"># results</span>
+
+    <span class="k">if</span> <span class="n">selected_model</span> <span class="o">==</span> <span class="n">Model</span><span class="o">.</span><span class="n">STATS</span><span class="p">:</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+
+        <span class="c1"># odds ratios (reference: https://stackoverflow.com/a/47740828)</span>
+
+        <span class="n">params</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">params</span>
+        <span class="n">odds_ratios</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">conf_int</span><span class="p">()</span>
+        <span class="n">odds_ratios</span><span class="p">[</span><span class="s1">&#39;Odds Ratio&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span>
+        <span class="n">odds_ratios</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;5%&#39;</span><span class="p">,</span> <span class="s1">&#39;95%&#39;</span><span class="p">,</span> <span class="s1">&#39;Odds Ratio&#39;</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">odds_ratios</span><span class="p">))</span>
+
+        <span class="c1"># AU-ROC</span>
+
+        <span class="n">fpr</span><span class="p">,</span> <span class="n">tpr</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">roc_curve</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred_proba</span><span class="p">)</span>
+        <span class="n">auc</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred_proba</span><span class="p">)</span>
+        
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fpr</span><span class="p">,</span> <span class="n">tpr</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">label_name</span><span class="si">}</span><span class="s1"> Logistic Regression (AUC = </span><span class="si">{</span><span class="n">auc</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;False Positive Rate&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;True Positive Rate&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;ROC Curve&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s1">&#39;lower right&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+        <span class="c1"># AU-PRC</span>
+
+        <span class="n">precision</span><span class="p">,</span> <span class="n">recall</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">precision_recall_curve</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred_proba</span><span class="p">)</span>
+        <span class="n">auc_pr</span> <span class="o">=</span> <span class="n">average_precision_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred_proba</span><span class="p">)</span>
+
+        <span class="c1"># baseline (ratio of positive instances)</span>
+        <span class="n">baseline</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">y_test</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_test</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">recall</span><span class="p">,</span> <span class="n">precision</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">label_name</span><span class="si">}</span><span class="s1"> (AUPRC = </span><span class="si">{</span><span class="n">auc_pr</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>    
+        <span class="n">plt</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">baseline</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Baseline = </span><span class="si">{</span><span class="n">baseline</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span> <span class="c1"># baseline</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Recall&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Precision&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Precision-Recall Curve&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s1">&#39;upper right&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+        <span class="c1"># weights</span>
+
+        <span class="n">feature_names</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+        <span class="n">df_weights</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;feature&#39;</span><span class="p">:</span> <span class="n">feature_names</span><span class="p">,</span> <span class="s1">&#39;weight&#39;</span><span class="p">:</span> <span class="n">weights</span><span class="p">})</span>
+        <span class="n">df_weights</span> <span class="o">=</span> <span class="n">df_weights</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="s1">&#39;weight&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">barh</span><span class="p">(</span><span class="n">df_weights</span><span class="p">[</span><span class="s1">&#39;feature&#39;</span><span class="p">],</span> <span class="n">df_weights</span><span class="p">[</span><span class="s1">&#39;weight&#39;</span><span class="p">])</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Weight&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Feature&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">label_name</span><span class="si">}</span><span class="s1"> Feature Weights&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+        <span class="c1"># p-values</span>
+
+        <span class="n">p_values</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">pvalues</span>
+        <span class="n">df_p_values</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;feature&#39;</span><span class="p">:</span> <span class="n">feature_names</span><span class="p">,</span> <span class="s1">&#39;p-value&#39;</span><span class="p">:</span> <span class="n">p_values</span><span class="p">})</span>
+        <span class="n">df_p_values</span> <span class="o">=</span> <span class="n">df_p_values</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="s1">&#39;p-value&#39;</span><span class="p">)</span>
+        <span class="n">df_p_values</span><span class="p">[</span><span class="s1">&#39;significant (&lt; 0.05)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_p_values</span><span class="p">[</span><span class="s1">&#39;p-value&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.05</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="n">df_p_values</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">selected_model</span> <span class="o">==</span> <span class="n">Model</span><span class="o">.</span><span class="n">SKLEARN</span><span class="p">:</span>
+        <span class="c1"># AU-ROC</span>
+
+        <span class="n">fpr</span><span class="p">,</span> <span class="n">tpr</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">roc_curve</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred_proba</span><span class="p">)</span>
+        <span class="n">auc</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred_proba</span><span class="p">)</span>
+        
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fpr</span><span class="p">,</span> <span class="n">tpr</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">label_name</span><span class="si">}</span><span class="s1"> Logistic Regression (AUC = </span><span class="si">{</span><span class="n">auc</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;False Positive Rate&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;True Positive Rate&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;ROC Curve&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s1">&#39;lower right&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+        <span class="c1"># weights</span>
+
+        <span class="n">feature_names</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">pipe</span><span class="o">.</span><span class="n">named_steps</span><span class="p">[</span><span class="s1">&#39;logisticregression&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">coef_</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+        <span class="n">df_weights</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;feature&#39;</span><span class="p">:</span> <span class="n">feature_names</span><span class="p">,</span> <span class="s1">&#39;weight&#39;</span><span class="p">:</span> <span class="n">weights</span><span class="p">})</span>
+        <span class="n">df_weights</span> <span class="o">=</span> <span class="n">df_weights</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="s1">&#39;weight&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">barh</span><span class="p">(</span><span class="n">df_weights</span><span class="p">[</span><span class="s1">&#39;feature&#39;</span><span class="p">],</span> <span class="n">df_weights</span><span class="p">[</span><span class="s1">&#39;weight&#39;</span><span class="p">])</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Weight&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Feature&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">label_name</span><span class="si">}</span><span class="s1"> Feature Weights&#39;</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">df_weights</span></div>
+
+<div class="viewcode-block" id="normalize_weights"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.normalize_weights">[docs]</a><span class="k">def</span> <span class="nf">normalize_weights</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">weight_column</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;weight&#39;</span><span class="p">,</span> <span class="n">threshold</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">save_to</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Normalize the weights in a DataFrame relative to the smallest non-zero absolute weight and set near-zero values to 0.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the weights and variables.</span>
+<span class="sd">        weight_column (str, optional): Column inside the DataFrame containing the weights. Defaults to &#39;weight&#39;.</span>
+<span class="sd">        threshold (float, optional): Threshold for when to consider a value to be 0. Defaults to 0.05.</span>
+<span class="sd">        save_to (str: optional): Path to where a csv of the weights should be saved. Defaults to None.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pandas.DataFrame: The DataFrame with the normalized weights.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_temp</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">df_temp</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df_temp</span><span class="p">[</span><span class="n">weight_column</span><span class="p">]</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">weight_column</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c1"># smallest non-zero absolute weight</span>
+    <span class="n">min_weight</span> <span class="o">=</span> <span class="n">df_temp</span><span class="p">[</span><span class="n">df_temp</span><span class="p">[</span><span class="n">weight_column</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">][</span><span class="n">weight_column</span><span class="p">]</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">df_temp</span><span class="p">[</span><span class="s1">&#39;normalized_weight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_temp</span><span class="p">[</span><span class="n">weight_column</span><span class="p">]</span> <span class="o">/</span> <span class="n">min_weight</span>
+
+    <span class="k">if</span> <span class="n">save_to</span> <span class="o">!=</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">df_temp</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">save_to</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">df_temp</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">weight_column</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df_temp</span></div>
+
+<div class="viewcode-block" id="load_weights"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.load_weights">[docs]</a><span class="k">def</span> <span class="nf">load_weights</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">features</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">feature_column</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;feature&#39;</span><span class="p">,</span> <span class="n">weight_column</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s1">&#39;normalized_weight&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Loads weights for specified features from a DataFrame.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pd.DataFrame): DataFrame with &#39;feature&#39; and &#39;normalized_weight&#39; columns.</span>
+<span class="sd">        features (list): Features to load weights for.</span>
+<span class="sd">        feature_column (str): Column name with the feature names. Defaults to &#39;feature&#39;.</span>
+<span class="sd">        weight_column (str): Column name with the weights. Defaults to &#39;normalized_weight&#39;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Feature names mapped to their weights. Unfound features get `None`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">weights</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">feature</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">weight</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">feature_column</span><span class="p">]</span> <span class="o">==</span> <span class="n">feature</span><span class="p">][</span><span class="n">weight_column</span><span class="p">])</span>
+            <span class="n">weights</span><span class="p">[</span><span class="n">feature</span><span class="p">]</span> <span class="o">=</span> <span class="n">weight</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: </span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2"> not found in DataFrame.&quot;</span><span class="p">)</span>
+            <span class="n">weights</span><span class="p">[</span><span class="n">feature</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">return</span> <span class="n">weights</span></div>
+
+<div class="viewcode-block" id="get_brier"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_brier">[docs]</a><span class="k">def</span> <span class="nf">get_brier</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">categorical_column</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">calculate_prob</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate and print the Brier score for a score and outcome.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        score_column (str): The column name containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        categorical_column (list): Column to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_test</span> <span class="o">=</span> <span class="n">get_test_data</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_column</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_prob</span><span class="p">)</span> <span class="c1"># NOTE: test_size == 0 is handled in get_test_data</span>
+
+    <span class="k">if</span> <span class="n">df_test</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Probabilities for </span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1"> contain missings.&#39;</span><span class="p">)</span>
+        <span class="n">df_test</span> <span class="o">=</span> <span class="n">corr_utils</span><span class="o">.</span><span class="n">covariate</span><span class="o">.</span><span class="n">exclude_rows</span><span class="p">(</span><span class="n">df_test</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">])</span> <span class="c1"># NOTE: investigate missings</span>
+
+    <span class="c1"># reference: https://scikit-learn.org/stable/modules/model_evaluation.html#brier-score-loss</span>
+    <span class="n">y_true</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">y_prob</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span>
+    <span class="n">brier_score</span> <span class="o">=</span> <span class="n">brier_score_loss</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_prob</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Brier score for </span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1"> and </span><span class="si">{</span><span class="n">outcome_column</span><span class="si">}</span><span class="s1">: </span><span class="si">{</span><span class="n">brier_score</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">brier_score</span></div>
+
+<div class="viewcode-block" id="get_brier_skill"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_brier_skill">[docs]</a><span class="k">def</span> <span class="nf">get_brier_skill</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">categorical_column</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate and print the Brier skill score for a score and outcome.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        score_column (str): The column name containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        categorical_column (list): Column to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        float: The Brier skill score.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_test</span> <span class="o">=</span> <span class="n">get_test_data</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_column</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span> <span class="c1"># NOTE: test_size == 0 is handled in get_test_data</span>
+
+    <span class="k">if</span> <span class="n">df_test</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Probabilities for </span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1"> contain missings.&#39;</span><span class="p">)</span>
+        <span class="n">df_test</span> <span class="o">=</span> <span class="n">corr_utils</span><span class="o">.</span><span class="n">covariate</span><span class="o">.</span><span class="n">exclude_rows</span><span class="p">(</span><span class="n">df_test</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">])</span> <span class="c1"># NOTE: investigate missings</span>
+
+    <span class="c1"># reference: https://scikit-learn.org/stable/modules/model_evaluation.html#brier-score-loss</span>
+    <span class="n">y_true</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">y_prob</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span>
+    <span class="n">brier_score</span> <span class="o">=</span> <span class="n">brier_score_loss</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_prob</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Brier score for </span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1"> and </span><span class="si">{</span><span class="n">outcome_column</span><span class="si">}</span><span class="s1">: </span><span class="si">{</span><span class="n">brier_score</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="c1"># reference / baseline score (reference: https://machinelearningmastery.com/probability-metrics-for-imbalanced-classification/)</span>
+    <span class="n">baseline</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">])</span>
+    <span class="n">baseline_brier</span> <span class="o">=</span> <span class="n">brier_score_loss</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">baseline</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Baseline Brier score: </span><span class="si">{</span><span class="n">baseline_brier</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">skill_score</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="p">(</span><span class="n">brier_score</span> <span class="o">/</span> <span class="n">baseline_brier</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Brier skill score: </span><span class="si">{</span><span class="n">skill_score</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">skill_score</span></div>
+
+<div class="viewcode-block" id="get_calibration"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_calibration">[docs]</a><span class="k">def</span> <span class="nf">get_calibration</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_columns</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">groups</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">    Plots the calibration plot for a given score and outcome. Also prints the calibration slope and intercept.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        score_columns (list): The column names containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        groups (int, optional): Number of groups to split the data into. Defaults to 10.</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">score_column</span> <span class="ow">in</span> <span class="n">score_columns</span><span class="p">:</span>
+        <span class="n">df_test</span> <span class="o">=</span> <span class="n">get_test_data</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span> <span class="c1"># NOTE: test_size == 0 is handled in get_test_data</span>
+        
+        <span class="n">observed</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span>
+        <span class="n">predicted</span> <span class="o">=</span> <span class="n">df_test</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span>
+
+        <span class="n">prob_true</span><span class="p">,</span> <span class="n">prob_pred</span> <span class="o">=</span> <span class="n">calibration_curve</span><span class="p">(</span><span class="n">observed</span><span class="p">,</span> <span class="n">predicted</span><span class="p">,</span> <span class="n">n_bins</span><span class="o">=</span><span class="n">groups</span><span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">prob_pred</span><span class="p">,</span> <span class="n">prob_true</span><span class="p">,</span> <span class="s1">&#39;s-&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;Calibration for </span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;k--&#39;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Perfect Calibration&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Mean Predicted Probability&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Fraction of Positives&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Calibration Plot&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">prob_pred</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">prob_true</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()):</span> 
+        <span class="n">model</span> <span class="o">=</span> <span class="n">LinearRegression</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">prob_pred</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">prob_true</span><span class="p">)</span>
+        <span class="n">calibration_slope</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">coef_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">calibration_intercept</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">intercept_</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">calibration_slope</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+        <span class="n">calibration_intercept</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Calibration slope: </span><span class="si">{</span><span class="n">calibration_slope</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Calibration intercept: </span><span class="si">{</span><span class="n">calibration_intercept</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="get_score_regression"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_score_regression">[docs]</a><span class="k">def</span> <span class="nf">get_score_regression</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Performs logistic regression for a categorical score and its predicted outcome. Prints the results.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        score_column (str): The column name containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+      
+    <span class="c1"># reference: https://mskcc-epi-bio.github.io/decisioncurveanalysis/dca-tutorial-python.html#Multivariable_Decision_Curve_Analysis</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">GLM</span><span class="o">.</span><span class="n">from_formula</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">outcome_column</span><span class="si">}</span><span class="s1"> ~ C(</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">family</span><span class="o">=</span><span class="n">sm</span><span class="o">.</span><span class="n">families</span><span class="o">.</span><span class="n">Binomial</span><span class="p">())</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="n">results</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="get_dca"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_dca">[docs]</a><span class="k">def</span> <span class="nf">get_dca</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_columns</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">y_limits</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">],</span> <span class="n">thresholds</span><span class="p">:</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.10</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">),</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Plot decision curves for a given score and outcome.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        score_columns (list): The column names containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        y_limits (list, optional): Y-axis limits for the plot. Defaults to [-0.01, 0.02].</span>
+<span class="sd">        thresholds (np.ndarray, optional): Array of thresholds for decision curve analysis. Defaults to np.arange(0, 0.10, 0.01).</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: A DataFrame containing the results.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">categorical_column</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">score_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">categorical_columns</span><span class="p">:</span>
+        <span class="n">categorical_column</span> <span class="o">=</span> <span class="p">[</span><span class="n">score_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>      
+
+    <span class="n">df_test</span> <span class="o">=</span> <span class="n">get_test_data</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_column</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span> <span class="c1"># NOTE: test_size == 0 is handled in get_test_data</span>
+    <span class="n">df_test</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">score_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">df_test</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">:</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">},</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">score_columns</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">score_column</span> <span class="ow">in</span> <span class="n">score_columns</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="n">categorical_column</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">score_column</span> <span class="ow">in</span> <span class="n">categorical_columns</span><span class="p">:</span>
+                <span class="n">categorical_column</span> <span class="o">=</span> <span class="p">[</span><span class="n">score_column</span><span class="p">]</span>             
+            <span class="n">df_test</span><span class="p">[</span><span class="n">score_column</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_test_data</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_column</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">score_column</span><span class="si">}</span><span class="s1">_probability&#39;</span><span class="p">]</span> 
+
+    <span class="c1"># reference: https://mskcc-epi-bio.github.io/decisioncurveanalysis/dca-tutorial-python.html</span>
+    <span class="n">df_dca</span> <span class="o">=</span> <span class="n">dca</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_test</span><span class="p">,</span> <span class="n">outcome</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">modelnames</span><span class="o">=</span><span class="n">score_columns</span><span class="p">,</span> <span class="n">thresholds</span><span class="o">=</span><span class="n">thresholds</span><span class="p">)</span>
+    
+    <span class="c1"># print(df_dca)</span>
+    <span class="n">plot_graphs</span><span class="p">(</span><span class="n">plot_df</span><span class="o">=</span><span class="n">df_dca</span><span class="p">,</span> <span class="n">graph_type</span><span class="o">=</span><span class="s1">&#39;net_benefit&#39;</span><span class="p">,</span> <span class="n">y_limits</span><span class="o">=</span><span class="n">y_limits</span><span class="p">,</span> <span class="n">color_names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;blue&#39;</span><span class="p">,</span> <span class="s1">&#39;green&#39;</span><span class="p">,</span> <span class="s1">&#39;red&#39;</span><span class="p">,</span> <span class="s1">&#39;pink&#39;</span><span class="p">,</span> <span class="s1">&#39;black&#39;</span><span class="p">][:</span><span class="nb">len</span><span class="p">(</span><span class="n">score_columns</span><span class="p">)</span><span class="o">+</span><span class="mi">2</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">df_dca</span></div>
+
+<div class="viewcode-block" id="validate_score"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.validate_score">[docs]</a><span class="k">def</span> <span class="nf">validate_score</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">score_columns</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">dca_y_limits</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">],</span> <span class="n">dca_thresholds</span><span class="p">:</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.10</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">),</span> <span class="n">categorical_columns</span><span class="p">:</span><span class="nb">list</span><span class="o">=</span><span class="p">[],</span> <span class="n">calculate_proba</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validates a score on all important metrics.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        score_columns (list): The column names containing the scores.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        test_size (float, optional): Proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+<span class="sd">        dca_y_limits (list, optional): Y-axis limits for the decision curve analysis (DCA) plot. Defaults to [-0.01, 0.02].</span>
+<span class="sd">        dca_thresholds (np.ndarray, optional): Array of thresholds for DCA. Defaults to np.arange(0, 0.10, 0.01).</span>
+<span class="sd">        categorical_columns (list): A list of columns to consider as categorical (will be one-hot encoded). Defaults to [].</span>
+<span class="sd">        calculate_proba(bool, optional): Whether to calculate outcome probabilities for scores (on test data). Defaults to False. </span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: Prints the results</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;####################&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Performance:</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">score_column</span> <span class="ow">in</span> <span class="n">score_columns</span><span class="p">:</span>
+        <span class="n">categorical_column</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">score_column</span> <span class="ow">in</span> <span class="n">categorical_columns</span><span class="p">:</span>
+            <span class="n">categorical_column</span> <span class="o">=</span> <span class="p">[</span><span class="n">score_column</span><span class="p">]</span>
+        <span class="n">_</span> <span class="o">=</span> <span class="n">get_brier_skill</span><span class="p">(</span><span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">score_column</span><span class="o">=</span><span class="n">score_column</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_column</span><span class="o">=</span><span class="n">categorical_column</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;####################&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Calibration: </span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">_</span> <span class="o">=</span> <span class="n">get_calibration</span><span class="p">(</span><span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">score_columns</span><span class="o">=</span><span class="n">score_columns</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;####################&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Discrimination: </span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">_</span> <span class="o">=</span> <span class="n">get_auroc</span><span class="p">(</span><span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">score_columns</span><span class="o">=</span><span class="n">score_columns</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">get_auprc</span><span class="p">(</span><span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">score_columns</span><span class="o">=</span><span class="n">score_columns</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;####################&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Clinical Value: </span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">_</span> <span class="o">=</span> <span class="n">get_dca</span><span class="p">(</span><span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">score_columns</span><span class="o">=</span><span class="n">score_columns</span><span class="p">,</span> <span class="n">outcome_column</span><span class="o">=</span><span class="n">outcome_column</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">y_limits</span><span class="o">=</span><span class="n">dca_y_limits</span><span class="p">,</span> <span class="n">thresholds</span><span class="o">=</span><span class="n">dca_thresholds</span><span class="p">,</span> <span class="n">categorical_columns</span><span class="o">=</span><span class="n">categorical_columns</span><span class="p">,</span> <span class="n">calculate_proba</span><span class="o">=</span><span class="n">calculate_proba</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="get_important_features"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.get_important_features">[docs]</a><span class="k">def</span> <span class="nf">get_important_features</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">feature_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">outcome_column</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">n_features</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Gets the most important features predicting an outcome by means of Recursive Feature Elimination (RFE).</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        feature_column (list): The column name containing the feature.</span>
+<span class="sd">        outcome_column (str): The column name containing the outcome indicators.</span>
+<span class="sd">        n_features (int, optional): The amount of features to select. Defaults to 10.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list containing the selected features. Also prints AU-ROC.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># convert to one-hot encoded variables; split data</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">feature_column</span><span class="p">])</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">outcome_column</span><span class="p">]</span>
+
+    <span class="c1"># train-test split</span>
+    <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+
+    <span class="c1"># feature selection using RFE (reference: https://www.geeksforgeeks.org/recursive-feature-elimination-with-cross-validation-in-scikit-learn/)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">LogisticRegression</span><span class="p">(</span><span class="n">max_iter</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="n">rfe</span> <span class="o">=</span> <span class="n">RFE</span><span class="p">(</span><span class="n">estimator</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">n_features_to_select</span><span class="o">=</span><span class="n">n_features</span><span class="p">)</span>
+    <span class="n">rfe</span> <span class="o">=</span> <span class="n">rfe</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+    <span class="c1"># get selected features (reference: https://stackoverflow.com/a/51090544)</span>
+    <span class="n">selected_features</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="n">rfe</span><span class="o">.</span><span class="n">support_</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Selected ICD code features: </span><span class="si">{</span><span class="n">selected_features</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="c1"># build model</span>
+    <span class="n">X_train_selected</span> <span class="o">=</span> <span class="n">X_train</span><span class="p">[</span><span class="n">selected_features</span><span class="p">]</span>
+    <span class="n">X_test_selected</span> <span class="o">=</span> <span class="n">X_test</span><span class="p">[</span><span class="n">selected_features</span><span class="p">]</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train_selected</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+    <span class="c1"># evaluate model</span>
+    <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test_selected</span><span class="p">)</span>
+    <span class="n">roc_auc</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test_selected</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;AUC-ROC: </span><span class="si">{</span><span class="n">roc_auc</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">selected_features</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="convert_score"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.analysis.convert_score">[docs]</a><span class="k">def</span> <span class="nf">convert_score</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">original_score</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">new_score</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert a score back to the same values as the original by building groups.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pandas.DataFrame): The input DataFrame containing the data.</span>
+<span class="sd">        original_score (list): The column names containing the old scores.</span>
+<span class="sd">        new_score (str):  The column names containing the new scores.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: The DataFrame with the added converted score.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_temp</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># old_min = int(df_temp[original_score].min())</span>
+    <span class="c1"># old_max = int(df_temp[original_score].max())</span>
+    <span class="n">old_length</span> <span class="o">=</span> <span class="n">df_temp</span><span class="p">[</span><span class="n">original_score</span><span class="p">]</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span> 
+    <span class="n">old_labels</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">df_temp</span><span class="p">[</span><span class="n">original_score</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+
+    <span class="n">unique_scores</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">df_temp</span><span class="p">[</span><span class="n">new_score</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+
+    <span class="n">new_score_groups</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">qcut</span><span class="p">(</span><span class="n">unique_scores</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="n">old_length</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">old_labels</span><span class="p">)</span>
+    <span class="n">group_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">score</span><span class="p">:</span> <span class="n">group</span> <span class="k">for</span> <span class="n">score</span><span class="p">,</span> <span class="n">group</span>  <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">unique_scores</span><span class="p">,</span> <span class="n">new_score_groups</span><span class="p">)}</span>
+
+    <span class="n">df_temp</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">new_score</span><span class="si">}</span><span class="s1">_converted&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_temp</span><span class="p">[</span><span class="n">new_score</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">group_map</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df_temp</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Noel Kronenberg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

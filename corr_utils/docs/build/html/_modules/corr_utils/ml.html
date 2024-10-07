@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>corr_utils.ml &mdash; corr_utils 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js?v=e031e9a9"></script>
+        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            corr_utils
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../corr_utils.html">corr_utils package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">corr_utils</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../corr_utils.html">corr_utils</a></li>
+      <li class="breadcrumb-item active">corr_utils.ml</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for corr_utils.ml</h1><div class="highlight"><pre>
+<span></span><span class="c1"># author: Noel Kronenberg</span>
+
+<span class="c1"># imports </span>
+
+<span class="kn">import</span> <span class="nn">corr_utils</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
+
+<span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">train_test_split</span>
+<span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">StandardScaler</span><span class="p">,</span> <span class="n">MinMaxScaler</span>
+<span class="kn">from</span> <span class="nn">imblearn.over_sampling</span> <span class="kn">import</span> <span class="n">RandomOverSampler</span> <span class="c1"># imbalanced-learn</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">roc_auc_score</span><span class="p">,</span> <span class="n">average_precision_score</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">classification_report</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+
+<span class="c1"># default key for unqiue rows and merging of DataFrames</span>
+<span class="k">global</span> <span class="n">default_key</span>
+<span class="c1"># default_key:str = corr_utils.default_key</span>
+
+<span class="c1"># custom ML (DL)</span>
+
+<span class="c1"># references:</span>
+<span class="c1"># - https://pytorch.org/tutorials/beginner/basics/buildmodel_tutorial.html</span>
+<span class="c1"># - https://github.com/flatplanet/Pytorch-Tutorial-Youtube/blob/main/simple_NeuralNetwork.ipynb</span>
+
+<span class="c1"># data</span>
+
+<div class="viewcode-block" id="preprocessing"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.preprocessing">[docs]</a><span class="k">def</span> <span class="nf">preprocessing</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">variables</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">outcome</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">scale</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resample</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">test_size</span><span class="p">:</span><span class="nb">float</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s1">&#39;tuple[torch.FloatTensor, torch.FloatTensor, torch.LongTensor, torch.LongTensor]&#39;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Preprocesses a dataset by scaling, resampling, and converting to tensors.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pd.DataFrame): The input dataframe.</span>
+<span class="sd">        variables (list): The list of feature column names.</span>
+<span class="sd">        outcome (str): The target column name.</span>
+<span class="sd">        scale (bool, optional): Whether to scale the features (range(0,1)). Defaults to True.</span>
+<span class="sd">        resample (bool, optional): Whether to perform (random) oversampling on the dataset. Defaults to False.</span>
+<span class="sd">        tensor (bool, optional): Whether to convert the data into PyTorch tensors. Defaults to True.</span>
+<span class="sd">        test_size (float, optional): The proportion of the dataset to include in the test split. Defaults to 0.2.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple[torch.FloatTensor, torch.FloatTensor, torch.LongTensor, torch.LongTensor]: A tuple containing the train and test sets as tensors or arrays (X_train, X_test, y_train, y_test).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df_patients_ML</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># extract data</span>
+    <span class="n">df_X</span> <span class="o">=</span> <span class="n">df_patients_ML</span><span class="p">[</span><span class="n">variables</span><span class="p">]</span>
+    <span class="n">df_y</span> <span class="o">=</span> <span class="n">df_patients_ML</span><span class="p">[</span><span class="n">outcome</span><span class="p">]</span>
+
+    <span class="c1"># over sampling (reference: https://github.com/dataprofessor/imbalanced-data/blob/main/imbalanced_learn.ipynb)</span>
+    <span class="k">if</span> <span class="n">resample</span><span class="p">:</span>
+        <span class="n">ros</span> <span class="o">=</span> <span class="n">RandomOverSampler</span><span class="p">(</span><span class="n">sampling_strategy</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">df_X</span><span class="p">,</span> <span class="n">df_y</span> <span class="o">=</span> <span class="n">ros</span><span class="o">.</span><span class="n">fit_resample</span><span class="p">(</span><span class="n">df_X</span><span class="p">,</span> <span class="n">df_y</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Value counts: </span><span class="se">\n</span><span class="si">{</span><span class="n">df_y</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="c1"># convert to array</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">df_X</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">df_y</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="c1"># scale data</span>
+    <span class="k">if</span> <span class="n">scale</span><span class="p">:</span>
+        <span class="n">scaler</span> <span class="o">=</span> <span class="n">MinMaxScaler</span><span class="p">(</span><span class="n">feature_range</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">scaler</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+    <span class="c1"># split data</span>
+    <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">tensor</span><span class="p">:</span>
+        <span class="c1"># convert to tensors</span>
+        <span class="n">X_train</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+        <span class="n">X_test</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+        <span class="n">y_train</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">(</span><span class="n">y_train</span><span class="p">)</span>
+        <span class="n">y_test</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">(</span><span class="n">y_test</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span></div>
+
+<div class="viewcode-block" id="get_eda_metrics"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.get_eda_metrics">[docs]</a><span class="k">def</span> <span class="nf">get_eda_metrics</span><span class="p">(</span><span class="n">X_train</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">X_test</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">y_train</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">y_test</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">variables</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">outcome</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates exploratory data analysis (EDA) metrics and plots.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        X_train (torch.Tensor): The features for training.</span>
+<span class="sd">        X_test (torch.Tensor): The features for testing.</span>
+<span class="sd">        y_train (torch.Tensor): The lables for training.</span>
+<span class="sd">        y_test (torch.Tensor): The lables for testing.</span>
+<span class="sd">        variables (list): List of feature names.</span>
+<span class="sd">        outcome (str): Name of the target variable.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: Displays histograms of features and outcome.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+       
+    <span class="n">X_train_np</span> <span class="o">=</span> <span class="n">X_train</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">X_test_np</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">y_train_np</span> <span class="o">=</span> <span class="n">y_train</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">y_test_np</span> <span class="o">=</span> <span class="n">y_test</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+
+    <span class="n">X_combined_np</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">X_train_np</span><span class="p">,</span> <span class="n">X_test_np</span><span class="p">))</span>
+    <span class="n">y_combined_np</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">y_train_np</span><span class="p">,</span> <span class="n">y_test_np</span><span class="p">))</span>
+    <span class="n">df_combined</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">X_combined_np</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">variables</span><span class="p">)</span>
+    <span class="n">df_combined</span><span class="p">[</span><span class="n">outcome</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_combined_np</span>
+
+    <span class="n">num_vars</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">variables</span><span class="p">)</span>
+    <span class="n">num_plots</span> <span class="o">=</span> <span class="n">num_vars</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">num_rows</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_plots</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">//</span> <span class="mi">3</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">nrows</span><span class="o">=</span><span class="n">num_rows</span><span class="p">,</span> <span class="n">ncols</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">num_rows</span> <span class="o">*</span> <span class="mi">3</span><span class="p">))</span>
+    <span class="n">axes</span> <span class="o">=</span> <span class="n">axes</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">var</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">variables</span> <span class="o">+</span> <span class="p">[</span><span class="n">outcome</span><span class="p">]):</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">df_combined</span><span class="p">[</span><span class="n">var</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s1">&#39;hist&#39;</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="n">var</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Value&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Frequency&#39;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">)):</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">delaxes</span><span class="p">(</span><span class="n">axes</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="get_class_weights"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.get_class_weights">[docs]</a><span class="k">def</span> <span class="nf">get_class_weights</span><span class="p">(</span><span class="n">y_train</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">show</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculates class weights for imbalanced datasets.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        y_train (torch.Tensor): The lables for training.</span>
+<span class="sd">        show (bool, optional): Whether to print the class weights. Defaults to False.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.Tensor: Tensor containing class weights.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">class_counts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">y_train</span><span class="p">)</span>
+    <span class="n">total_samples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_train</span><span class="p">)</span>
+
+    <span class="c1"># class weights as the inverse of class frequency (reference: https://medium.com/@ravi.abhinav4/improving-class-imbalance-with-class-weights-in-machine-learning-af072fdd4aa4)</span>
+    <span class="n">class_weights</span> <span class="o">=</span> <span class="n">total_samples</span> <span class="o">/</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">class_counts</span><span class="p">)</span> <span class="o">*</span> <span class="n">class_counts</span><span class="o">.</span><span class="n">float</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Class weights: </span><span class="si">{</span><span class="n">class_weights</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">class_weights</span></div>
+
+<span class="c1"># model</span>
+
+<div class="viewcode-block" id="Model"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.Model">[docs]</a><span class="k">class</span> <span class="nc">Model</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enumeration for selecting different model architectures.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">CUSTOM</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">RESNET</span> <span class="o">=</span> <span class="mi">2</span> <span class="c1"># vision</span></div>
+
+<div class="viewcode-block" id="NeuralNetwork"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.NeuralNetwork">[docs]</a><span class="k">class</span> <span class="nc">NeuralNetwork</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Custom fully connected neural network.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        in_features (int): Number of input features.</span>
+<span class="sd">        h1 (int, optional): Number of neurons in the first hidden layer. Defaults to 16.</span>
+<span class="sd">        h2 (int, optional): Number of neurons in the second hidden layer. Defaults to 16.</span>
+<span class="sd">        h3 (int, optional): Number of neurons in the third hidden layer. Defaults to 16.</span>
+<span class="sd">        out_features (int, optional): Number of output features. Defaults to 2.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_features</span><span class="p">,</span> <span class="n">h1</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">h2</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">h3</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">out_features</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span> <span class="c1"># specify width</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span> <span class="c1"># instantiate nn.Module</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fc1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="p">,</span> <span class="n">h1</span><span class="p">)</span> <span class="c1"># fully connected first hidden layer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fc2</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">h1</span><span class="p">,</span> <span class="n">h2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fc3</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">h2</span><span class="p">,</span> <span class="n">h3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">out</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">h3</span><span class="p">,</span> <span class="n">out_features</span><span class="p">)</span> <span class="c1"># output layer</span>
+
+<div class="viewcode-block" id="NeuralNetwork.forward"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.NeuralNetwork.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc1</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="c1"># start with first hidden layer and ReLu</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc2</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc3</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">out</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="c1"># output layer</span>
+        <span class="c1"># x = F.softmax(x, dim=1) # get probabilities</span>
+        <span class="k">return</span> <span class="n">x</span></div></div>
+    
+<div class="viewcode-block" id="ResNet"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.ResNet">[docs]</a><span class="k">class</span> <span class="nc">ResNet</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ResNet-based neural network model.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        num_classes (int, optional): Number of output classes. Defaults to 2.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ResNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="c1"># pre-trained ResNet</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># replace final fully connected layer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span> <span class="n">num_classes</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ResNet.forward"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.ResNet.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></div></div>
+
+<div class="viewcode-block" id="get_model"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.get_model">[docs]</a><span class="k">def</span> <span class="nf">get_model</span><span class="p">(</span><span class="n">features</span><span class="p">:</span><span class="nb">int</span><span class="p">,</span> <span class="n">class_weights_tensor</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">selected_model</span><span class="p">:</span><span class="n">Model</span><span class="o">=</span><span class="n">Model</span><span class="o">.</span><span class="n">CUSTOM</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Instantiates and returns a model, criterion, and optimizer.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        features (int): Number of input features.</span>
+<span class="sd">        class_weights_tensor (torch.Tensor, optional): Tensor containing class weights. Defaults to None.</span>
+<span class="sd">        selected_model (Model, optional): Enum to select model architecture. Defaults to Model.CUSTOM.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        tuple: A tuple containing the model, criterion, and optimizer.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+     
+    <span class="c1"># create a model instance</span>
+    <span class="k">if</span> <span class="n">selected_model</span> <span class="o">==</span> <span class="n">Model</span><span class="o">.</span><span class="n">CUSTOM</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">NeuralNetwork</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">selected_model</span> <span class="o">==</span> <span class="n">Model</span><span class="o">.</span><span class="n">RESNET</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">ResNet</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+
+    <span class="c1"># criterion of model to measure the error</span>
+    <span class="k">if</span> <span class="n">class_weights_tensor</span> <span class="o">!=</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># with class weights</span>
+        <span class="n">criterion</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">(</span><span class="n">weight</span><span class="o">=</span><span class="n">class_weights_tensor</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># without class weights</span>
+        <span class="n">criterion</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">()</span>
+
+    <span class="c1"># optimizer and learning rate</span>
+    <span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.001</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">model</span><span class="p">,</span> <span class="n">criterion</span><span class="p">,</span> <span class="n">optimizer</span></div>
+
+<span class="c1"># training</span>
+
+<div class="viewcode-block" id="train"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.train">[docs]</a><span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="n">X_train</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">y_train</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span><span class="n">NeuralNetwork</span><span class="p">,</span> <span class="n">criterion</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">epochs</span><span class="p">:</span><span class="nb">int</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Trains a neural network model.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        X_train (torch.Tensor): The features for training.</span>
+<span class="sd">        y_train (torch.Tensor): The labels for training.</span>
+<span class="sd">        model (NeuralNetwork): The neural network model.</span>
+<span class="sd">        criterion: The loss function.</span>
+<span class="sd">        optimizer: The optimizer for gradient descent.</span>
+<span class="sd">        epochs (int, optional): Number of training epochs. Defaults to 100.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: Displays the training loss over epochs.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">losses</span> <span class="o">=</span> <span class="p">[]</span> 
+    <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">epochs</span><span class="p">):</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span> <span class="c1"># get predictions</span>
+        
+        <span class="c1"># save loss</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">criterion</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+        <span class="n">losses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">loss</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span> <span class="c1"># turn into number</span>
+
+        <span class="k">if</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Epoch: </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1"> and loss: </span><span class="si">{</span><span class="n">loss</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="c1"># back propagation</span>
+        <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+        <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+        <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">epochs</span><span class="p">),</span> <span class="n">losses</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;loss&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Epoch&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span></div>
+
+<span class="c1"># evaluation</span>
+
+<div class="viewcode-block" id="evaluate"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.evaluate">[docs]</a><span class="k">def</span> <span class="nf">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">:</span><span class="n">NeuralNetwork</span><span class="p">,</span> <span class="n">X_train</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">y_train</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">X_test</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">y_test</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Evaluates a model on the training and test sets.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        model (NeuralNetwork): The trained neural network model.</span>
+<span class="sd">        X_train (torch.Tensor): The features for training.</span>
+<span class="sd">        y_train (torch.Tensor): The labels for training.</span>
+<span class="sd">        X_test (torch.Tensor): The features for testing.</span>
+<span class="sd">        y_test (torch.Tensor): The labels for testing.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: Prints the results.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Performance on training set: </span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">classification_report</span><span class="p">(</span><span class="n">y_train</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">))</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Performance on test set: </span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">classification_report</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">))</span> 
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;AU-ROC on test set: &#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">X_test</span><span class="p">)[:,</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">auc_score</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">auc_score</span><span class="p">)</span> 
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;AU-PRC on test set: &#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">X_test</span><span class="p">)[:,</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">auc_score</span> <span class="o">=</span> <span class="n">average_precision_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">auc_score</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39; (baseline: </span><span class="si">{</span><span class="nb">sum</span><span class="p">(</span><span class="n">y_test</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="n">y_test</span><span class="p">)</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span> </div>
+
+<span class="c1"># prediction</span>
+
+<div class="viewcode-block" id="get_prediction"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.get_prediction">[docs]</a><span class="k">def</span> <span class="nf">get_prediction</span><span class="p">(</span><span class="n">data</span><span class="p">:</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span><span class="n">NeuralNetwork</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="c1"># e.g. torch.FloatTensor([1, 1, 1, 1, 1])</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Predicts the class and probabilities for the given input data.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        data (torch.Tensor): Input tensor for prediction.</span>
+<span class="sd">        model (NeuralNetwork): The neural network model.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: Prints the prediction.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">y_pred_proba</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">predicted_class</span> <span class="o">=</span> <span class="n">y_pred</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="n">prob_class_0</span> <span class="o">=</span> <span class="n">y_pred_proba</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="n">prob_class_1</span> <span class="o">=</span> <span class="n">y_pred_proba</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Predicted class: </span><span class="si">{</span><span class="n">predicted_class</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Probability for class 0: </span><span class="si">{</span><span class="n">prob_class_0</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Probability for class 1: </span><span class="si">{</span><span class="n">prob_class_1</span><span class="si">:</span><span class="s1">.2f</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+<span class="c1"># weights</span>
+
+<div class="viewcode-block" id="get_weights"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.get_weights">[docs]</a><span class="k">def</span> <span class="nf">get_weights</span><span class="p">(</span><span class="n">model</span><span class="p">:</span><span class="n">NeuralNetwork</span><span class="p">,</span> <span class="n">variables</span><span class="p">:</span><span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieves feature weights of a neural network.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        model (NeuralNetwork): The neural network model.</span>
+<span class="sd">        variables (list): List of feature names.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: DataFrame containing feature importance scores.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fc1</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span>
+    <span class="n">feature_importance</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">normalized_importance</span> <span class="o">=</span> <span class="n">feature_importance</span> <span class="o">/</span> <span class="n">feature_importance</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="n">df_feature_importance</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;variable&#39;</span><span class="p">:</span> <span class="n">variables</span><span class="p">,</span> <span class="s1">&#39;weight&#39;</span><span class="p">:</span> <span class="n">normalized_importance</span><span class="o">.</span><span class="n">tolist</span><span class="p">()})</span>
+    <span class="n">df_feature_importance</span><span class="p">[</span><span class="s1">&#39;weight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_feature_importance</span><span class="p">[</span><span class="s1">&#39;weight&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">df_feature_importance</span></div>
+
+<span class="c1"># export</span>
+
+<div class="viewcode-block" id="export_model_state"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.export_model_state">[docs]</a><span class="k">def</span> <span class="nf">export_model_state</span><span class="p">(</span><span class="n">model</span><span class="p">:</span><span class="n">NeuralNetwork</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Exports a model&#39;s state dictionary to a file as well as the onnx.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        model (NeuralNetwork): The neural network model.</span>
+<span class="sd">        path (str): The directory path where the model should be saved.</span>
+<span class="sd">        name (str): The name of the file to save the model state.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># reference: https://pytorch.org/tutorials//beginner/onnx/export_simple_model_to_onnx_tutorial.html</span>
+    <span class="n">dummy_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">model</span><span class="o">.</span><span class="n">fc1</span><span class="o">.</span><span class="n">in_features</span><span class="p">)</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">onnx</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dummy_input</span><span class="p">,</span> 
+                      <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">path</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">name</span><span class="si">}</span><span class="s1">.onnx&#39;</span><span class="p">,</span> 
+                      <span class="n">export_params</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                      <span class="n">input_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;input&quot;</span><span class="p">],</span> 
+                      <span class="n">output_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;output&quot;</span><span class="p">])</span>
+    
+    <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="n">path</span> <span class="o">+</span> <span class="n">name</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="import_model"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.import_model">[docs]</a><span class="k">def</span> <span class="nf">import_model</span><span class="p">(</span><span class="n">path</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralNetwork</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Imports a model&#39;s state dictionary from a file.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        path (str): The directory path from where the model should be loaded.</span>
+<span class="sd">        name (str): The name of the file containing the model state.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        NeuralNetwork: The neural network model with the loaded state.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">new_model</span> <span class="o">=</span> <span class="n">NeuralNetwork</span><span class="p">()</span>
+    <span class="n">new_model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">path</span> <span class="o">+</span> <span class="n">name</span><span class="p">))</span></div>
+    
+<span class="c1"># wrapper</span>
+
+<div class="viewcode-block" id="wrapper"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.wrapper">[docs]</a><span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">variables</span><span class="p">:</span><span class="nb">list</span><span class="p">,</span> <span class="n">outcome</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A wrapper function to preprocess data, train, and evaluate a model.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        df (pd.DataFrame): The dataframe containing the data.</span>
+<span class="sd">        variables (list): List of feature column names.</span>
+<span class="sd">        outcome (str): The name of the outcome column.</span>
+<span class="sd">        epochs (int, optional): Number of epochs to train. Defaults to 100.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        None: Prints the results.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">preprocessing</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">variables</span><span class="p">,</span> <span class="n">outcome</span><span class="p">)</span>
+    <span class="n">class_weights_tensor</span> <span class="o">=</span> <span class="n">get_class_weights</span><span class="p">(</span><span class="n">y_train</span><span class="p">)</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">criterion</span><span class="p">,</span> <span class="n">optimizer</span> <span class="o">=</span> <span class="n">get_model</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">variables</span><span class="p">),</span> <span class="n">class_weights_tensor</span><span class="p">)</span>
+    <span class="n">train</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">criterion</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">epochs</span><span class="p">)</span>
+    <span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span><span class="p">)</span></div>
+
+
+<span class="c1"># AutoML</span>
+
+<span class="kn">from</span> <span class="nn">pycaret.classification</span> <span class="kn">import</span> <span class="o">*</span> <span class="c1"># pip install --upgrade &#39;joblib&lt;1.4&#39; pycaret (https://github.com/pycaret/pycaret/issues/3959)</span>
+
+<span class="c1"># reference: https://pycaret.gitbook.io/docs/get-started/quickstart; https://www.datacamp.com/blog/top-python-libraries-for-data-science</span>
+<div class="viewcode-block" id="get_autoML"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.get_autoML">[docs]</a><span class="k">def</span> <span class="nf">get_autoML</span><span class="p">(</span><span class="n">data</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">model_name</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">object</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Performs AutoML using PyCaret (https://github.com/pycaret/pycaret/) to compare models and evaluate the best one.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        data (pd.DataFrame): The dataframe containing (all) the data.</span>
+<span class="sd">        target (str): The name of the target column.</span>
+<span class="sd">        model_name (str, optional): The name to save the best model. Defaults to None.</span>
+<span class="sd">        save (bool, optional): Whether to save the best model. Defaults to False.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        object: The best model found by PyCaret.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+     
+    <span class="c1"># initialize training environment and create transformation pipeline</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">ClassificationExperiment</span><span class="p">()</span>
+    <span class="n">s</span><span class="o">.</span><span class="n">setup</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="n">session_id</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+
+    <span class="c1"># train and evaluate all estimators using cross-validation</span>
+    <span class="c1"># prints scoring grid with average cross-validated scores</span>
+    <span class="n">best</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">compare_models</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">best</span><span class="p">)</span>
+
+    <span class="c1"># analyze the performance of a trained model on test set</span>
+    <span class="n">s</span><span class="o">.</span><span class="n">evaluate_model</span><span class="p">(</span><span class="n">best</span><span class="p">)</span>
+
+    <span class="c1"># scores the data and returns prediction_label and prediction_score probability of the predicted class</span>
+    <span class="c1"># when data is None, predicts on test set </span>
+    <span class="c1"># note: Score = probability of the predicted class (not positive)</span>
+    <span class="n">s</span><span class="o">.</span><span class="n">predict_model</span><span class="p">(</span><span class="n">best</span><span class="p">)</span>
+
+    <span class="c1"># show pipeline (reference: https://nbviewer.org/github/pycaret/examples/blob/main/PyCaret%202%20Classification.ipynb)</span>
+    <span class="kn">from</span> <span class="nn">sklearn</span> <span class="kn">import</span> <span class="n">set_config</span>
+    <span class="n">set_config</span><span class="p">(</span><span class="n">display</span><span class="o">=</span><span class="s1">&#39;diagram&#39;</span><span class="p">)</span>
+    <span class="n">best</span>
+    <span class="n">set_config</span><span class="p">(</span><span class="n">display</span><span class="o">=</span><span class="s1">&#39;text&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+        <span class="c1"># save model</span>
+        <span class="n">s</span><span class="o">.</span><span class="n">save_model</span><span class="p">(</span><span class="n">best</span><span class="p">,</span> <span class="n">model_name</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">best</span></div>
+
+<div class="viewcode-block" id="load_autoML"><a class="viewcode-back" href="../../corr_utils.html#corr_utils.ml.load_autoML">[docs]</a><span class="k">def</span> <span class="nf">load_autoML</span><span class="p">(</span><span class="n">model_name</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">object</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Loads a saved PyCaret model.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        model_name (str): The name of the model file to load.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        object: The loaded PyCaret model.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># load model</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">ClassificationExperiment</span><span class="p">()</span>
+    <span class="n">loaded_model</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="n">loaded_model</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">loaded_model</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Noel Kronenberg.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
