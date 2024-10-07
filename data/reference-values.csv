@@ -1,0 +1,6 @@
+variable,min_value,max_value
+height,140,232
+weight,35,300
+bmi,5,80
+op_length,10,720
+asa_status,1,6

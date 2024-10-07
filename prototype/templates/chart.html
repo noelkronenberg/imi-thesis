@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+        <script src="{{ url_for('static', filename='js/checkbox.js') }}"></script>
+
+        <title>Chart</title>
+    </head>
+
+    <body>
+
+        <div class="content">
+
+            <button onclick="switchToScores()" id="backButton">&#x2190; back</button>
+
+            <div class="chart-wrapper">
+                <canvas id="chart" width="550" height="550"></canvas>
+            </div>
+
+            <div class="parameter-box-wrapper">
+
+                <div class="parameter-box">
+                    <h2>Case</h2>
+
+                    <p class="parameters">
+                        {% for label, value, median_value in zip(score_labels, scores_values, score_median_values) %}
+                            {% if value > median_value %}
+                                {{ label }}: <span class="highlight high-value">{{ value }}%</span>
+                            {% else %}
+                                {{ label }}: <span class="highlight">{{ value }}%</span>
+                            {% endif %}
+                            <br>
+                        {% endfor %}                 
+                    </p>
+                </div>
+
+                <form class="parameter-box" id="checkboxForm">
+                    <h2>Cohort</h2>
+                    
+                    <p class="parameters">
+                        {% for label, median_value in zip(score_labels, score_median_values) %}
+                            {{ label }}: <span class="highlight">{{ median_value }} %</span>
+                            <br>
+                        {% endfor %}  
+
+                        {% if n_comparisons > 1 or n_comparisons == 0%}
+                            Size: <span class="highlight">{{ n_comparisons }} cases</span>
+                        {% else %}
+                            Size: <span class="highlight">{{ n_comparisons }} case</span>
+                        {% endif %}
+                    </p>
+
+                    <label for="age">
+                        <input type="checkbox" id="age" name="age" value="true">Age
+                    </label><br>
+                    <label for="ops">
+                        <input type="checkbox" id="ops" name="ops" value="true">OPS Code
+                    </label><br>
+
+                    <button type="button" onclick="generateURL()">Update</button>
+                </form>
+
+            </div>
+
+        </div>
+
+        <p id="caseIDWrapper">
+            <a href="/">Case ID</a>: <span id="caseID">{{ case_id }}</span>
+        </p>
+
+        <!-- chart settings -->
+        <script>
+            // references: 
+            // https://www.chartjs.org/docs/latest/samples/other-charts/polar-area-center-labels.html
+            // https://www.chartjs.org/docs/latest/charts/polar.html 
+
+            // score (and mean) values
+            const score_data_combined = {
+                labels: {{ score_labels | tojson}},
+                datasets: [
+                    {
+                        label: 'Median Risk (%)',
+                        backgroundColor: 'rgb(0, 0, 0, 0)',
+                        borderColor: 'rgb(0, 0, 0)',
+                        data: {{ score_median_values | tojson}},
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'Risk (%)',
+                        backgroundColor: {{ score_colors | tojson}},
+                        borderColor: {{ score_colors | tojson}},
+                        data: {{ scores_values | tojson}},
+                        borderWidth: 1,
+                    }]
+            };
+
+            // data for variables of scores
+
+            const cardiac_variable_data = {
+                labels: {{ cardiac_variable_labels | tojson}},
+                datasets: [{
+                    label: 'Points',
+                    backgroundColor: {{ cardiac_variable_colors | tojson}},
+                    borderColor: 'rgb(255, 255, 255)',
+                    data: {{ cardiac_variable_values | tojson}},
+                }]
+            };
+
+            const stroke_variable_data = {
+                labels: {{ stroke_variable_labels | tojson}},
+                datasets: [{
+                    label: 'Points',
+                    backgroundColor: {{ stroke_variable_colors | tojson}},
+                    borderColor: 'rgb(255, 255, 255)',
+                    data: {{ stroke_variable_values | tojson}},
+                }]
+            };
+
+            // mapping of score (label) to its variables
+            const labelMap = {
+                'Cardiac': cardiac_variable_data,
+                'Stroke': stroke_variable_data,
+            };
+
+            // configure chart
+            const config = {
+                type: 'polarArea',
+                data: score_data_combined,
+                options: {
+                    responsive: true,
+                    scales: {
+                        r: {
+                            pointLabels: {
+                                display: true,
+                                centerPointLabels: true,
+                                font: {
+                                    size: 14
+                                },
+                            },
+                            ticks: {
+                                stepSize: 1,
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false,
+                            position: 'top',
+                            onClick: null,
+                        },
+                        title: {
+                            display: true,
+                            text: 'Scores',
+                        },
+                    },
+                },
+            };
+
+            // show chart
+            const chart = new Chart(
+                document.getElementById('chart'),
+                config
+            );
+
+            // show or hide back button
+            function toggleBackButton(show) {
+                const button = document.getElementById('backButton');
+                if (show) {
+                    button.style.display = 'inline-block';
+                } else {
+                    button.style.display = 'none'; 
+                }
+            }
+
+            // switch to variable data when specific score (label) is clicked
+            document.getElementById('chart').onclick = function (evt) {
+                const activePoints = chart.getElementsAtEventForMode(evt, 'point', { intersect: true });
+                if (activePoints.length > 0) {
+                    const clickedLabel = chart.data.labels[activePoints[0].index];
+
+                    if (clickedLabel in labelMap) {
+                        const newData = labelMap[clickedLabel];
+                        if (chart.config.data !== newData) {
+                            chart.config.data = newData;
+                            chart.options.plugins.title.text = clickedLabel;
+                            chart.update();
+
+                            toggleBackButton(true); // show back button
+                        }
+                    }
+                }
+            };
+
+            // switch data back to scores
+            function switchToScores() {
+                chart.config.data = score_data_combined;
+                chart.options.plugins.title.text = 'Scores';
+                chart.update();
+                
+                toggleBackButton(false); // hide back button
+            }
+        </script>
+
+    </body>
+
+</html>
