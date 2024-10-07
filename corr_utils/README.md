@@ -1,8 +1,8 @@
 # CORR Utils
 
-This (for now local) package contains utilities for working with the CORR. It makes use of the minimal package structure as defined [here](https://python-packaging.readthedocs.io/en/latest/minimal.html).
+> Note that this is a copy of the original CORR-Utils package (housed in a separate repository for continuous development). It has been added to the ```imi-thesis``` repository for reference.
 
-> If questions or requests arise, please contact [Noel Kronenberg](mailto:noel.kronenberg@charite.de).
+This (for now local) package contains utilities for working with the CORR. It makes use of the minimal package structure as defined [here](https://python-packaging.readthedocs.io/en/latest/minimal.html).
 
 ## Structure
 
@@ -14,7 +14,7 @@ This (for now local) package contains utilities for working with the CORR. It ma
 ## Set-up
 
 ```bash
-cd noel_thesis/corr_utils
+cd corr_utils
 pip install -e .
 ```
 
@@ -29,7 +29,7 @@ df_sap_lab_cleaned = covariate.extract_df_data(df_sap_lab, col_dict={'c_falnr':'
 ## Testing
 
 ```bash
-cd noel_thesis/corr_utils
+cd corr_utils
 python setup.py test
 ```
 
@@ -38,7 +38,7 @@ python setup.py test
 The documentation can be found here: [noelkronenberg.github.io/corr_utils/](noelkronenberg.github.io/corr_utils/). It can be updated with [Sphinx](https://www.sphinx-doc.org/en/master/index.html):
 
 ```bash
-cd noel_thesis/corr_utils/docs
+cd corr_utils/docs
 make clean
 make html
 ```
